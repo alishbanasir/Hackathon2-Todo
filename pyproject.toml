@@ -1,0 +1,30 @@
+[project]
+name = "todo-cli"
+version = "0.1.0"
+description = "Phase I In-Memory Python Todo CLI with Clean Architecture"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "rich>=14.2.0",
+]
+
+[project.scripts]
+todo = "todo.interface.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = []
