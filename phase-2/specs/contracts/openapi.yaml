@@ -1,0 +1,539 @@
+openapi: 3.1.0
+info:
+  title: Todo Full-Stack Web Application API
+  description: |
+    RESTful API for multi-user todo management with JWT authentication.
+    All endpoints (except auth) require Bearer token in Authorization header.
+
+    **User Isolation**: Every response is filtered by authenticated user's ID.
+    Users can only access their own todos (FR-018, FR-019, FR-020).
+
+    **Base URL**: `http://localhost:8000/api/v1` (development)
+  version: 1.0.0
+  contact:
+    name: Phase II Development Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.example.com/v1
+    description: Production server (Phase IV)
+
+tags:
+  - name: Authentication
+    description: User registration, login, and logout
+  - name: Todos
+    description: CRUD operations for todo items
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user account
+      description: |
+        Create a new user account with email and password.
+        Automatically logs in user and returns JWT token (FR-001, FR-005).
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+      responses:
+        '201':
+          description: User account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error or email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidEmail:
+                  value:
+                    error: "Invalid email address format"
+                    details: "Email must match RFC 5322 format"
+                weakPassword:
+                  value:
+                    error: "Password must be at least 8 characters"
+                emailTaken:
+                  value:
+                    error: "Email already registered"
+                    details: "Please use a different email or login"
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email and password
+      description: |
+        Authenticate user and return JWT token (FR-005, FR-006).
+        Token must be included in Authorization header for all protected endpoints.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Invalid email or password"
+                details: "Please check your credentials and try again"
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout current user
+      description: |
+        Invalidate current session (client-side token removal).
+        JWT tokens are stateless; backend cannot revoke tokens (FR-007).
+      operationId: logoutUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /todos:
+    get:
+      tags:
+        - Todos
+      summary: List all user's todos
+      description: |
+        Retrieve all todos owned by authenticated user (FR-012, FR-018).
+        Todos are ordered by creation date (newest first).
+      operationId: listTodos
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of todos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  todos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Todo'
+                  count:
+                    type: integer
+                    description: Total number of todos
+                    example: 5
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      tags:
+        - Todos
+      summary: Create new todo
+      description: |
+        Create a new todo for authenticated user (FR-009, FR-010, FR-011).
+        User ID is extracted from JWT token (not request body).
+      operationId: createTodo
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoCreateRequest'
+      responses:
+        '201':
+          description: Todo created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                emptyTitle:
+                  value:
+                    error: "Title must be 1-200 characters"
+                titleTooLong:
+                  value:
+                    error: "Title must be 1-200 characters"
+                descriptionTooLong:
+                  value:
+                    error: "Description cannot exceed 2000 characters"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /todos/{id}:
+    get:
+      tags:
+        - Todos
+      summary: Get todo by ID
+      description: |
+        Retrieve single todo by ID (FR-013).
+        Returns 403 if todo exists but belongs to different user (FR-019).
+      operationId: getTodoById
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TodoId'
+      responses:
+        '200':
+          description: Todo details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags:
+        - Todos
+      summary: Update todo
+      description: |
+        Update todo title and/or description (FR-014).
+        Can only update own todos (FR-019).
+      operationId: updateTodo
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TodoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TodoUpdateRequest'
+      responses:
+        '200':
+          description: Todo updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      tags:
+        - Todos
+      summary: Delete todo
+      description: |
+        Permanently delete todo (FR-016).
+        Can only delete own todos (FR-019).
+        Deletion cannot be undone.
+      operationId: deleteTodo
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TodoId'
+      responses:
+        '200':
+          description: Todo deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Todo deleted successfully"
+                  id:
+                    type: integer
+                    description: ID of deleted todo
+                    example: 42
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /todos/{id}/toggle:
+    patch:
+      tags:
+        - Todos
+      summary: Toggle todo completion status
+      description: |
+        Toggle todo between complete and incomplete (FR-015).
+        Can only toggle own todos (FR-019).
+      operationId: toggleTodoCompletion
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TodoId'
+      responses:
+        '200':
+          description: Todo status toggled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Todo'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token issued by Better Auth on login/registration.
+        Include in Authorization header: `Bearer <token>`
+
+  parameters:
+    TodoId:
+      name: id
+      in: path
+      required: true
+      description: Unique todo identifier
+      schema:
+        type: integer
+        minimum: 1
+        example: 42
+
+  schemas:
+    UserRegistrationRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: User's email address (must be unique)
+          example: "user@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Password (minimum 8 characters)
+          example: "securepass123"
+
+    UserLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "user@example.com"
+        password:
+          type: string
+          format: password
+          description: User's password
+          example: "securepass123"
+
+    AuthResponse:
+      type: object
+      required:
+        - token
+        - user
+      properties:
+        token:
+          type: string
+          description: JWT access token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    UserProfile:
+      type: object
+      required:
+        - id
+        - email
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+          example: "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "user@example.com"
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp (UTC)
+          example: "2026-01-07T10:30:00Z"
+
+    TodoCreateRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Todo title (required)
+          example: "Complete Phase II specification"
+        description:
+          type: string
+          maxLength: 2000
+          description: Optional detailed description
+          example: "Write comprehensive spec.md with user stories, requirements, and success criteria"
+
+    TodoUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Updated title (optional)
+          example: "Complete Phase II specification and planning"
+        description:
+          type: string
+          maxLength: 2000
+          description: Updated description (optional)
+          example: "Write spec.md and plan.md with all required sections"
+
+    Todo:
+      type: object
+      required:
+        - id
+        - user_id
+        - title
+        - description
+        - completed
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Unique todo identifier
+          example: 42
+        user_id:
+          type: string
+          format: uuid
+          description: Owner's user ID (for reference only, not editable)
+          example: "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d"
+        title:
+          type: string
+          maxLength: 200
+          description: Todo title
+          example: "Complete Phase II specification"
+        description:
+          type: string
+          maxLength: 2000
+          description: Todo description (may be empty string)
+          example: "Write comprehensive spec.md with user stories"
+        completed:
+          type: boolean
+          description: Completion status
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp (UTC)
+          example: "2026-01-07T09:15:00Z"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: User-friendly error message
+          example: "Invalid email address format"
+        details:
+          type: string
+          description: Additional error context (optional)
+          example: "Email must match RFC 5322 format"
+
+  responses:
+    UnauthorizedError:
+      description: Missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Unauthorized"
+            details: "Valid JWT token required in Authorization header"
+
+    ForbiddenError:
+      description: Access denied - resource belongs to different user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Access denied"
+            details: "You are not authorized to access this resource"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Todo not found"
+            details: "No todo with the specified ID exists"
+
+security:
+  - BearerAuth: []
