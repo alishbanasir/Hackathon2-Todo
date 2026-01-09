@@ -3,7 +3,6 @@
  */
 
 import {
-  ApiError,
   AuthResponse,
   LoginRequest,
   RegisterRequest,
