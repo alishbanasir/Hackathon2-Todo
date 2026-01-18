@@ -90,3 +90,17 @@ pnpm-lock.yaml
 
 # Project specific
 todo-cli/
+
+# Phase 3 Frontend (Next.js)
+phase-3/frontend/node_modules/
+phase-3/frontend/.next/
+phase-3/frontend/out/
+phase-3/frontend/.env.local
+phase-3/frontend/.env.*.local
+!phase-3/frontend/lib/
+
+# Phase 3 Backend
+phase-3/backend/venv/
+phase-3/backend/.env
+phase-3/backend/alembic/versions/*.pyc
+tmpclaude-*

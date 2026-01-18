@@ -33,12 +33,28 @@ function Get-CurrentBranch {
     
     # For non-git repos, try to find the latest feature directory
     $repoRoot = Get-RepoRoot
+    $latestFeature = ""
+    $highest = 0
+
+    # Check phase-specific specs directories first (phase-1 through phase-5)
+    for ($i = 5; $i -ge 1; $i--) {
+        $phaseSpecsDir = Join-Path $repoRoot "phase-$i/specs"
+        if (Test-Path $phaseSpecsDir) {
+            Get-ChildItem -Path $phaseSpecsDir -Directory | ForEach-Object {
+                if ($_.Name -match '^(\d{3})-') {
+                    $num = [int]$matches[1]
+                    if ($num -gt $highest) {
+                        $highest = $num
+                        $latestFeature = $_.Name
+                    }
+                }
+            }
+        }
+    }
+
+    # Also check root-level specs directory
     $specsDir = Join-Path $repoRoot "specs"
-    
     if (Test-Path $specsDir) {
-        $latestFeature = ""
-        $highest = 0
-        
         Get-ChildItem -Path $specsDir -Directory | ForEach-Object {
             if ($_.Name -match '^(\d{3})-') {
                 $num = [int]$matches[1]
@@ -48,10 +64,10 @@ function Get-CurrentBranch {
                 }
             }
         }
-        
-        if ($latestFeature) {
-            return $latestFeature
-        }
+    }
+
+    if ($latestFeature) {
+        return $latestFeature
     }
     
     # Final fallback
@@ -89,6 +105,17 @@ function Test-FeatureBranch {
 
 function Get-FeatureDir {
     param([string]$RepoRoot, [string]$Branch)
+
+    # Check for phase-specific specs directories (phase-1, phase-2, phase-3, etc.)
+    # Try to detect which phase this feature belongs to
+    for ($i = 1; $i -le 5; $i++) {
+        $phaseSpecsPath = Join-Path $RepoRoot "phase-$i/specs/$Branch"
+        if (Test-Path $phaseSpecsPath) {
+            return $phaseSpecsPath
+        }
+    }
+
+    # Fall back to root-level specs directory (for non-phase features or phase-1)
     Join-Path $RepoRoot "specs/$Branch"
 }
 
