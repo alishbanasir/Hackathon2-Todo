@@ -10,7 +10,8 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.ai.gemini_client import GeminiClient
+# ✅ YAHAN CHANGE - Relative import
+from ..ai.gemini_client import GeminiClient
 from src.api.deps import get_current_user_id, get_session
 from src.schemas.chat import ChatRequest, ChatResponse
 from src.services.chat_service import ChatService
