@@ -1,45 +1,20 @@
-"""Database connection and session management."""
+"""Database connection and session management - Unified for Phase 2 & 3."""
 
-import ssl
-from typing import AsyncGenerator, Optional
-
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
-
 from src.config import settings
 
 # Convert postgresql:// to postgresql+asyncpg:// for async support
-database_url = settings.database_url
-if database_url.startswith("postgresql://"):
-    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
+database_url = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
-# Remove sslmode from URL - asyncpg doesn't support it as URL param
-# SSL is handled via connect_args instead
-import re
-database_url = re.sub(r'[?&]sslmode=[^&]*', '', database_url)
-# Clean up any trailing ? or &&
-database_url = database_url.rstrip('?').replace('&&', '&').rstrip('&')
-
-print(f"[DATABASE] Connecting to: {database_url[:50]}...")
-
-# Create SSL context for asyncpg (Neon requires SSL)
-ssl_context = ssl.create_default_context()
-ssl_context.check_hostname = False
-ssl_context.verify_mode = ssl.CERT_NONE
-
-# Create async engine with SSL support
-try:
-    engine: AsyncEngine = create_async_engine(
-        database_url,
-        echo=settings.is_development,
-        future=True,
-        connect_args={"ssl": ssl_context},
-    )
-    print("[DATABASE] Engine created successfully")
-except Exception as e:
-    print(f"[DATABASE] ERROR creating engine: {e}")
-    raise
+# Create async engine
+engine = create_async_engine(
+    database_url,
+    echo=settings.is_development,
+    future=True,
+)
 
 # Create async session factory
 async_session_maker = sessionmaker(
@@ -48,18 +23,20 @@ async_session_maker = sessionmaker(
     expire_on_commit=False,
 )
 
-
 async def init_db() -> None:
-    """Initialize database tables (for development only)."""
+    """Initialize database tables."""
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
-
+# Phase 2 uses 'get_session'
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency for getting async database session."""
-    try:
-        async with async_session_maker() as session:
-            yield session
-    except Exception as e:
-        print(f"[DATABASE] Session error: {e}")
-        raise
+    """Dependency for Phase 2 async database session."""
+    async with async_session_maker() as session:
+        yield session
+
+# Phase 3 uses 'get_db_session' 
+# Hum bas Phase 2 wale function ko hi naye naam se point kar rahe hain
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Dependency for Phase 3 (AI Assistant) database session."""
+    async with async_session_maker() as session:
+        yield session
