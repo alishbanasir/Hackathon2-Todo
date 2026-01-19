@@ -10,10 +10,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from sqlmodel import SQLModel  # ADDED
 
 from src.config import settings
-from src.database import engine  # ADDED
+from src.database import engine
+from src.models import Base  # Pure SQLAlchemy Base
 from src.middleware.error_handler import (
     general_exception_handler,
     http_exception_handler,
@@ -96,13 +96,11 @@ async def startup_event() -> None:
     try:
         print("[DATABASE] Auto-creating missing tables...")
         async with engine.begin() as conn:
-            # Register models to metadata
-            from src.models.user import User
-            from src.models.conversation import Conversation
-            from src.models.message import Message
-            
-            # Sync tables with Neon
-            await conn.run_sync(SQLModel.metadata.create_all)
+            # Register models to metadata (already imported via Base)
+            from src.models import User, Conversation, Message  # noqa: F401
+
+            # Sync tables with Neon using pure SQLAlchemy Base
+            await conn.run_sync(Base.metadata.create_all)
         print("[DATABASE] Tables created/verified successfully.")
     except Exception as e:
         print(f"[DATABASE ERROR] Could not create tables: {e}")

@@ -9,13 +9,12 @@ import ssl
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel
 
 from src.config import settings
 
-# Import all models to register them with SQLModel.metadata
+# Import Base and all models to register them with SQLAlchemy metadata
 # This must happen before any database operations
-from src.models import User, Conversation, Message  # noqa: F401
+from src.models import Base, User, Conversation, Message  # noqa: F401
 
 # Prepare database URL for asyncpg
 database_url = settings.database_url
@@ -86,7 +85,7 @@ async def create_db_tables() -> None:
     This is provided for testing and development convenience only.
     """
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all)
 
 
 async def drop_db_tables() -> None:
@@ -95,4 +94,4 @@ async def drop_db_tables() -> None:
     WARNING: This will delete all data. Only use for testing.
     """
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.drop_all)
+        await conn.run_sync(Base.metadata.drop_all)
