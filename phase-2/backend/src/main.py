@@ -6,16 +6,16 @@ from fastapi.responses import PlainTextResponse
 
 # Create FastAPI app
 app = FastAPI(
-    title="Todo API",
-    description="Phase II Todo Full-Stack Web Application - Backend API",
+    title="Todo AI API",
+    description="Phase II Todo App with Phase III AI Integration",
     version="0.1.0",
 )
 
-# Add CORS middleware - Allow ALL origins for development
+# Add CORS middleware - Updated for production safety
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,
+    allow_credentials=True, # Credentials true karein auth ke liye
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -29,16 +29,18 @@ def ping():
 
 @app.get("/")
 def root():
-    return {"message": "Todo API - Phase II", "version": "0.1.0"}
+    return {"message": "Todo AI API - Unified Backend", "version": "1.0.0"}
 
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "service": "todo-api"}
+    return {"status": "healthy", "service": "todo-ai-api"}
 
 
 # Import and register API routers
-from src.api import auth, todos
+# Note: Ensure these paths exist in your project structure
+from src.api import auth, todos, chat 
 
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(todos.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
+app.include_router(todos.router, prefix="/api/v1", tags=["Todos"])
+app.include_router(chat.router, prefix="/api/v1/chat", tags=["AI Chatbot"]) # AI Router added here
