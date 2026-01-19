@@ -218,7 +218,7 @@ export default function FloatingChat() {
             <button
               onClick={handleSend}
               disabled={!inputValue.trim() || isLoading}
-              className="p-2.5 bg-black text-white rounded-xl border border-zinc-700 shadow-lg hover:bg-zinc-900 hover:border-zinc-500 transition-all active:scale-95 disabled:opacity-30 group"
+              className="p-2.5 bg-black text-white rounded-xl border border-zinc-700 shadow-lg shadow-black/50 hover:bg-zinc-900 hover:border-white/40 hover:ring-2 hover:ring-white/20 hover:shadow-xl transition-all active:scale-95 disabled:opacity-30 disabled:hover:ring-0 disabled:hover:border-zinc-700 group"
             >
               <svg className="w-5 h-5 text-white group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

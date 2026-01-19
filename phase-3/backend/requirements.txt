@@ -4,8 +4,8 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 
-# Database ORM
-sqlmodel==0.0.14
+# Database ORM - ✅ YE UPDATE KARO
+sqlmodel==0.0.16  # Changed from 0.0.14
 asyncpg==0.29.0
 
 # Authentication (Phase 2 compatibility)
@@ -14,7 +14,7 @@ python-multipart==0.0.6
 
 # AI Integration
 openai==1.6.1  # DEPRECATED: Keeping temporarily for rollback
-google-generativeai==0.8.6
+google-generativeai==0.8.6  # ⚠️ Deprecated - update later
 google-api-core==2.15.0
 
 # Configuration Management
