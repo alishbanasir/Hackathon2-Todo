@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 
 // Phase 3 AI Chatbot API URL
-// FloatingChat.tsx mein localhost hata kar ye dalen:
 // FloatingChat.tsx (Line 7)
 const AI_CHAT_API = "https://alishba-nasir-todo-api-backend.hf.space/chat";
 
