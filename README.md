@@ -1,3 +1,12 @@
+---
+title: Todo AI API Backend
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+app_port: 7860
+---
 # Todo CLI - Phase I: In-Memory Task Management
 
 A clean, CLI-based task management tool built with Clean Architecture principles.
