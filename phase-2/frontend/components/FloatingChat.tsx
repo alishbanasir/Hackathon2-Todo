@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react";
 
 // Phase 3 AI Chatbot API URL
 // FloatingChat.tsx (Line 7)
-const AI_CHAT_API = "https://alishba-nasir-todo-api-backend.hf.space/chat";
-
+// phase-2/frontend/components/FloatingChat.tsx (Line 7)
+const AI_CHAT_API = "https://alishba-nasir-todo-api-backend.hf.space/api/v1/chat";
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
