@@ -29,9 +29,9 @@ class GeminiClient:
     # ONLY stable chat-capable models (each has separate quota)
     # Excludes: TTS, image, robotics, gemma, lite, preview, experimental models
     MODEL_PREFERENCES = [
-        "gemini-1.5-flash",      # Primary stable model
+        "gemini-2.0-flash",      # Primary stable model
         "gemini-2.5-flash",      # Newer stable flash
-        "gemini-1.5-flash-001",  # Versioned stable
+        "gemini-2.0-flash-001",  # Versioned stable
         "gemini-2.5-pro",        # Pro tier fallback
     ]
 
@@ -53,8 +53,8 @@ class GeminiClient:
         """Initialize Gemini client with automatic model detection."""
         genai.configure(api_key=settings.google_api_key)
 
-        # Default to gemini-1.5-flash (current stable model)
-        self.model_name = "gemini-1.5-flash"
+        # Default to gemini-2.0-flash (current stable model)
+        self.model_name = "gemini-2.0-flash"
         self.available_models: List[str] = []
         self.exhausted_models: set = set()  # Track rate-limited models
         self.incompatible_models: set = set()  # Track models that don't support chat
