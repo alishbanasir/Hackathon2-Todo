@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Authentication
     better_auth_secret: str
 
+    # Google Gemini AI
+    google_api_key: str = ""
+
     # CORS
     cors_origins: str = "http://localhost:3000"
 
