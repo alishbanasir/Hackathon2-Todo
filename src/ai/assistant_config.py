@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ASSISTANT_INSTRUCTIONS = "You are a professional AI Todo Assistant. Help users manage their tasks effectively."
 
@@ -9,9 +9,10 @@ class AssistantConfig(BaseSettings):
     top_k: int = 40
     max_output_tokens: int = 2048
 
-    model_config = {
-        "env_prefix": "ASSISTANT_",
-        "protected_namespaces": ('settings_',)
-    }
+    model_config = SettingsConfigDict(
+        env_prefix="ASSISTANT_",
+        protected_namespaces=('settings_',),
+        extra="ignore"
+    )
 
 assistant_config = AssistantConfig()
