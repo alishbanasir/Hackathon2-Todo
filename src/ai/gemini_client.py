@@ -40,8 +40,9 @@ class GeminiClient:
 
             if available_models:
                 # Prefer stable models over experimental ones
-                # Use exact suffix match to avoid matching gemini-2.0-flash-exp when looking for gemini-2.0-flash
-                for preferred in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
+                # Try different model families in case one has quota exhausted
+                # gemini-2.5-flash is tried first as it may have separate quota from 2.0 series
+                for preferred in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
                     # Exact suffix match (model names are like "models/gemini-2.0-flash")
                     match = next((m for m in available_models if m.endswith(preferred)), None)
                     if match:
