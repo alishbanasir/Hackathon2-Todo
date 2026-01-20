@@ -29,29 +29,36 @@ class GeminiClient:
     def __init__(self) -> None:
         """Initialize Gemini client with automatic model detection."""
         genai.configure(api_key=settings.google_api_key)
-        
-        # We will try to find a valid model dynamically
-        self.model_name = "gemini-pro" # Default safe choice
-        
+
+        # Default to gemini-1.5-flash (current working model)
+        self.model_name = "gemini-1.5-flash"
+
         try:
-            # 1. Try to find models that support text generation
+            # Try to find models that support text generation
             available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            
+            logger.info("available_gemini_models", models=available_models[:5] if available_models else [])
+
             if available_models:
-                # Use gemini-1.5-flash if available, otherwise pick the first valid one
-                preferred = next((m for m in available_models if "1.5-flash" in m), available_models[0])
-                self.model_name = preferred
-            
+                # Prefer gemini-1.5-flash, then gemini-2.0-flash, then first available
+                for preferred in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]:
+                    match = next((m for m in available_models if preferred in m), None)
+                    if match:
+                        self.model_name = match
+                        break
+                else:
+                    self.model_name = available_models[0]
+
             self.model = genai.GenerativeModel(
                 model_name=self.model_name,
                 system_instruction=ASSISTANT_INSTRUCTIONS
             )
             logger.info("gemini_client_initialized", model=self.model_name)
-            
+
         except Exception as e:
             logger.error("gemini_discovery_failed", error=str(e))
-            # Hardcoded emergency fallback
-            self.model = genai.GenerativeModel("gemini-pro")
+            # Hardcoded emergency fallback to working model
+            self.model_name = "gemini-1.5-flash"
+            self.model = genai.GenerativeModel(self.model_name)
 
     def _get_gemini_type(self, type_str: str) -> protos.Type:
         return TYPE_MAPPING.get(str(type_str).lower(), protos.Type.STRING)
