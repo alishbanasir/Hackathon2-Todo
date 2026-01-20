@@ -39,14 +39,18 @@ class GeminiClient:
             logger.info("available_gemini_models", models=available_models[:5] if available_models else [])
 
             if available_models:
-                # Prefer gemini-1.5-flash, then gemini-2.0-flash, then first available
-                for preferred in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]:
-                    match = next((m for m in available_models if preferred in m), None)
+                # Prefer stable models over experimental ones
+                # Use exact suffix match to avoid matching gemini-2.0-flash-exp when looking for gemini-2.0-flash
+                for preferred in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
+                    # Exact suffix match (model names are like "models/gemini-2.0-flash")
+                    match = next((m for m in available_models if m.endswith(preferred)), None)
                     if match:
                         self.model_name = match
                         break
                 else:
-                    self.model_name = available_models[0]
+                    # Fallback: pick first non-exp model, or first available
+                    non_exp = [m for m in available_models if '-exp' not in m]
+                    self.model_name = non_exp[0] if non_exp else available_models[0]
 
             self.model = genai.GenerativeModel(
                 model_name=self.model_name,
