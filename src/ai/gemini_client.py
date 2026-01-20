@@ -30,8 +30,8 @@ class GeminiClient:
         """Initialize Gemini client with automatic model detection."""
         genai.configure(api_key=settings.google_api_key)
 
-        # Default to gemini-1.5-flash (current working model)
-        self.model_name = "gemini-1.5-flash"
+        # Default to gemini-2.0-flash (current stable model)
+        self.model_name = "gemini-2.0-flash"
 
         try:
             # Try to find models that support text generation
@@ -41,8 +41,8 @@ class GeminiClient:
             if available_models:
                 # Prefer stable models over experimental ones
                 # Try different model families in case one has quota exhausted
-                # gemini-2.5-flash is tried first as it may have separate quota from 2.0 series
-                for preferred in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
+                # Priority: gemini-2.0-flash (stable), then gemini-2.5-flash, then gemini-2.5-pro
+                for preferred in ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-001", "gemini-2.5-pro"]:
                     # Exact suffix match (model names are like "models/gemini-2.0-flash")
                     match = next((m for m in available_models if m.endswith(preferred)), None)
                     if match:
@@ -61,8 +61,8 @@ class GeminiClient:
 
         except Exception as e:
             logger.error("gemini_discovery_failed", error=str(e))
-            # Hardcoded emergency fallback to working model
-            self.model_name = "gemini-1.5-flash"
+            # Hardcoded emergency fallback to stable model
+            self.model_name = "gemini-2.0-flash"
             self.model = genai.GenerativeModel(self.model_name)
 
     def _get_gemini_type(self, type_str: str) -> protos.Type:
