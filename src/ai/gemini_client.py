@@ -107,23 +107,29 @@ class GeminiClient:
         history = self._format_conversation_history(conversation_history)
         gemini_tools = self._convert_tools_to_gemini_format(tools) if tools else None
         chat = self.model.start_chat(history=history)
-        
+
         try:
             response = await asyncio.to_thread(chat.send_message, message, tools=gemini_tools)
             candidate = response.candidates[0]
             text_response = "".join([p.text for p in candidate.content.parts if hasattr(p, 'text')])
-            function_calls = [{"name": p.function_call.name, "args": dict(p.function_call.args)} 
+            function_calls = [{"name": p.function_call.name, "args": dict(p.function_call.args)}
                              for p in candidate.content.parts if hasattr(p, 'function_call') and p.function_call]
-            return {"response": text_response or None, "function_calls": function_calls, "finish_reason": "STOP"}
+            # Return chat session for function call continuation
+            return {"response": text_response or None, "function_calls": function_calls, "finish_reason": "STOP", "chat": chat}
         except Exception as e:
             logger.error("gemini_send_failed", error=str(e))
             raise
 
-    async def submit_function_results(self, conversation_history: List[Dict[str, str]], function_responses: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-        history = self._format_conversation_history(conversation_history)
-        chat = self.model.start_chat(history=history)
+    async def submit_function_results(self, conversation_history: List[Dict[str, str]], function_responses: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None, chat: Optional[Any] = None) -> Dict[str, Any]:
+        # Use existing chat session if provided, otherwise create new one
+        if chat is None:
+            history = self._format_conversation_history(conversation_history)
+            chat = self.model.start_chat(history=history)
+
         parts = [protos.Part(function_response=protos.FunctionResponse(name=r["name"], response={"result": str(r["response"])})) for r in function_responses]
         response = await asyncio.to_thread(chat.send_message, parts, tools=self._convert_tools_to_gemini_format(tools) if tools else None)
         candidate = response.candidates[0]
         text_res = "".join([p.text for p in candidate.content.parts if hasattr(p, 'text')]) or "Done."
-        return {"response": text_res, "function_calls": [], "finish_reason": "STOP"}
+        function_calls = [{"name": p.function_call.name, "args": dict(p.function_call.args)}
+                         for p in candidate.content.parts if hasattr(p, 'function_call') and p.function_call]
+        return {"response": text_res, "function_calls": function_calls, "finish_reason": "STOP", "chat": chat}

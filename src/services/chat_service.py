@@ -330,6 +330,7 @@ class ChatService:
                         conversation_history=conversation_history,
                         user_id=user_id,
                         tools=tools,
+                        chat=response.get("chat"),
                     )
 
                 # Return text response
@@ -357,6 +358,7 @@ class ChatService:
         conversation_history: List[Dict[str, str]],
         user_id: UUID,
         tools: List[Dict[str, Any]],
+        chat: Optional[Any] = None,
     ) -> str:
         """Handle function calls from Gemini (FR-033).
 
@@ -365,6 +367,7 @@ class ChatService:
             conversation_history: Current conversation history
             user_id: User ID for tool execution context (FR-015, FR-030, FR-031)
             tools: MCP tools for continued function calling
+            chat: Active Gemini chat session for function response continuation
 
         Returns:
             Final assistant response after executing functions
@@ -436,11 +439,12 @@ class ChatService:
                     },
                 })
 
-        # Submit function results back to Gemini
+        # Submit function results back to Gemini (pass chat session to maintain context)
         final_response = await self.gemini_client.submit_function_results(
             conversation_history=conversation_history,
             function_responses=function_responses,
             tools=tools,
+            chat=chat,
         )
 
         # Handle cascading function calls (recursive)
@@ -454,6 +458,7 @@ class ChatService:
                 conversation_history=conversation_history,
                 user_id=user_id,
                 tools=tools,
+                chat=final_response.get("chat"),
             )
 
         return final_response["response"] or "I've completed that action."
