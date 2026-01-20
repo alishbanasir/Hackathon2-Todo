@@ -104,3 +104,4 @@ phase-3/backend/venv/
 phase-3/backend/.env
 phase-3/backend/alembic/versions/*.pyc
 tmpclaude-*
+NUL 
