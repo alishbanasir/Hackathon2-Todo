@@ -43,4 +43,4 @@ from src.api import auth, todos, chat
 
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(todos.router, prefix="/api/v1", tags=["Todos"])
-app.include_router(chat.router, prefix="/api/v1/chat", tags=["AI Chatbot"]) # AI Router added here
+app.include_router(chat.router, prefix="/api/v1", tags=["AI Chatbot"])  # Chat endpoint: /api/v1/chat
