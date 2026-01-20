@@ -7,7 +7,7 @@ import structlog
 import google.generativeai as genai
 from google.generativeai import protos
 from google.generativeai.types import GenerationConfig
-from google.api_core.exceptions import NotFound, ResourceExhausted
+from google.api_core.exceptions import NotFound, ResourceExhausted, InvalidArgument
 
 from src.config import settings
 from src.ai.assistant_config import ASSISTANT_INSTRUCTIONS
@@ -26,12 +26,27 @@ TYPE_MAPPING = {
 class GeminiClient:
     """Async wrapper for Google Gemini API operations."""
 
-    # Model preference order (each model has separate quota)
+    # ONLY stable chat-capable models (each has separate quota)
+    # Excludes: TTS, image, robotics, gemma, lite, preview, experimental models
     MODEL_PREFERENCES = [
-        "gemini-2.0-flash",
-        "gemini-2.5-flash",
-        "gemini-2.0-flash-001",
-        "gemini-2.5-pro",
+        "gemini-2.0-flash",      # Primary stable model
+        "gemini-2.5-flash",      # Newer stable flash
+        "gemini-2.0-flash-001",  # Versioned stable
+        "gemini-2.5-pro",        # Pro tier fallback
+    ]
+
+    # Patterns to EXCLUDE from fallback (non-chat models)
+    EXCLUDED_PATTERNS = [
+        "-tts",         # Text-to-speech models
+        "-image",       # Image generation models
+        "-lite",        # Lite models (limited capabilities)
+        "-preview",     # Preview/unstable models
+        "-exp",         # Experimental models
+        "robotics",     # Robotics models
+        "gemma",        # Gemma models (not chat-optimized)
+        "nano-",        # Nano models
+        "deep-research", # Research models
+        "computer-use", # Computer use models
     ]
 
     def __init__(self) -> None:
@@ -42,28 +57,24 @@ class GeminiClient:
         self.model_name = "gemini-2.0-flash"
         self.available_models: List[str] = []
         self.exhausted_models: set = set()  # Track rate-limited models
-        self.current_model_index = 0
+        self.incompatible_models: set = set()  # Track models that don't support chat
 
         try:
             # Try to find models that support text generation
             all_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             logger.info("available_gemini_models", models=all_models[:5] if all_models else [])
 
-            # Build ordered list of available models based on preferences
+            # Build ordered list of available models ONLY from preferences
+            # Do NOT add other models - they may not support multi-turn chat
             for preferred in self.MODEL_PREFERENCES:
                 match = next((m for m in all_models if m.endswith(preferred)), None)
-                if match:
+                if match and not self._is_excluded_model(match):
                     self.available_models.append(match)
-
-            # Add any remaining non-experimental models not in preferences
-            for m in all_models:
-                if m not in self.available_models and '-exp' not in m:
-                    self.available_models.append(m)
 
             if self.available_models:
                 self.model_name = self.available_models[0]
 
-            logger.info("ordered_model_fallbacks", models=self.available_models)
+            logger.info("chat_capable_models", models=self.available_models)
 
             self.model = genai.GenerativeModel(
                 model_name=self.model_name,
@@ -78,27 +89,42 @@ class GeminiClient:
             self.available_models = ["gemini-2.0-flash"]
             self.model = genai.GenerativeModel(self.model_name)
 
-    def _switch_to_next_model(self) -> bool:
-        """Switch to next available model when current one hits rate limits.
+    def _is_excluded_model(self, model_name: str) -> bool:
+        """Check if model should be excluded from fallback list."""
+        model_lower = model_name.lower()
+        return any(pattern in model_lower for pattern in self.EXCLUDED_PATTERNS)
+
+    def _switch_to_next_model(self, reason: str = "rate_limited") -> bool:
+        """Switch to next available model when current one fails.
+
+        Args:
+            reason: Why switching - "rate_limited" or "incompatible"
 
         Returns:
             True if switched successfully, False if no more models available.
         """
-        self.exhausted_models.add(self.model_name)
+        if reason == "incompatible":
+            self.incompatible_models.add(self.model_name)
+        else:
+            self.exhausted_models.add(self.model_name)
 
-        # Find next model not in exhausted set
+        # Find next model not in exhausted or incompatible sets
+        unavailable = self.exhausted_models | self.incompatible_models
         for model in self.available_models:
-            if model not in self.exhausted_models:
+            if model not in unavailable:
                 self.model_name = model
                 self.model = genai.GenerativeModel(
                     model_name=self.model_name,
                     system_instruction=ASSISTANT_INSTRUCTIONS
                 )
                 logger.info("switched_to_fallback_model", model=self.model_name,
-                           exhausted=list(self.exhausted_models))
+                           reason=reason, exhausted=list(self.exhausted_models),
+                           incompatible=list(self.incompatible_models))
                 return True
 
-        logger.warning("all_models_exhausted", exhausted=list(self.exhausted_models))
+        logger.warning("all_models_unavailable",
+                      exhausted=list(self.exhausted_models),
+                      incompatible=list(self.incompatible_models))
         return False
 
     def _get_gemini_type(self, type_str: str) -> protos.Type:
@@ -143,7 +169,7 @@ class GeminiClient:
         history = self._format_conversation_history(conversation_history)
         gemini_tools = self._convert_tools_to_gemini_format(tools) if tools else None
 
-        # Try with current model, fallback to others on rate limit
+        # Try with current model, fallback to others on rate limit or incompatibility
         last_error = None
         while True:
             chat = self.model.start_chat(history=history)
@@ -159,11 +185,23 @@ class GeminiClient:
                 logger.warning("model_rate_limited", model=self.model_name, error=str(e)[:100])
                 last_error = e
                 # Try switching to next model
-                if not self._switch_to_next_model():
-                    # No more models available, raise the error
+                if not self._switch_to_next_model(reason="rate_limited"):
                     logger.error("gemini_send_failed", error=str(e))
                     raise
                 # Continue loop with new model
+            except InvalidArgument as e:
+                # Model doesn't support multi-turn chat or has other capability issues
+                error_msg = str(e).lower()
+                if "multiturn" in error_msg or "chat" in error_msg:
+                    logger.warning("model_incompatible", model=self.model_name, error=str(e)[:100])
+                    last_error = e
+                    if not self._switch_to_next_model(reason="incompatible"):
+                        logger.error("gemini_send_failed", error=str(e))
+                        raise
+                    # Continue loop with new model
+                else:
+                    logger.error("gemini_send_failed", error=str(e))
+                    raise
             except Exception as e:
                 logger.error("gemini_send_failed", error=str(e))
                 raise
@@ -172,7 +210,7 @@ class GeminiClient:
         parts = [protos.Part(function_response=protos.FunctionResponse(name=r["name"], response={"result": str(r["response"])})) for r in function_responses]
         gemini_tools = self._convert_tools_to_gemini_format(tools) if tools else None
 
-        # Try with current model, fallback to others on rate limit
+        # Try with current model, fallback to others on rate limit or incompatibility
         while True:
             # Use existing chat session if provided, otherwise create new one
             if chat is None:
@@ -188,11 +226,21 @@ class GeminiClient:
                 return {"response": text_res, "function_calls": function_calls, "finish_reason": "STOP", "chat": chat}
             except ResourceExhausted as e:
                 logger.warning("model_rate_limited", model=self.model_name, error=str(e)[:100])
-                # Try switching to next model
-                if not self._switch_to_next_model():
+                if not self._switch_to_next_model(reason="rate_limited"):
                     logger.error("gemini_submit_failed", error=str(e))
                     raise
                 chat = None  # Reset chat to create new one with new model
+            except InvalidArgument as e:
+                error_msg = str(e).lower()
+                if "multiturn" in error_msg or "chat" in error_msg:
+                    logger.warning("model_incompatible", model=self.model_name, error=str(e)[:100])
+                    if not self._switch_to_next_model(reason="incompatible"):
+                        logger.error("gemini_submit_failed", error=str(e))
+                        raise
+                    chat = None  # Reset chat
+                else:
+                    logger.error("gemini_submit_failed", error=str(e))
+                    raise
             except Exception as e:
                 logger.error("gemini_submit_failed", error=str(e))
                 raise
