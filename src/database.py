@@ -52,6 +52,9 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+# Alias for backward compatibility with Phase 2 repositories
+async_session_maker = AsyncSessionLocal
+
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency for database session injection.

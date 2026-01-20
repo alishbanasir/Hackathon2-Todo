@@ -1,14 +1,12 @@
-"""Todo domain model."""
+"""Todo domain model - Pure SQLAlchemy ORM."""
 
-from datetime import datetime, timezone
-from typing import Optional
-from uuid import UUID
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, text
+from sqlalchemy.dialects.postgresql import UUID
 
-from sqlalchemy import DateTime
-from sqlmodel import Column, Field, ForeignKey, SQLModel, String
+from src.models.user import Base
 
 
-class Todo(SQLModel, table=True):
+class Todo(Base):
     """Todo entity representing a single task item owned by a user.
 
     Attributes:
@@ -22,49 +20,39 @@ class Todo(SQLModel, table=True):
 
     __tablename__ = "todos"
 
-    id: Optional[int] = Field(
-        default=None,
+    id = Column(
+        Integer,
         primary_key=True,
+        index=True,
+        autoincrement=True,
+    )
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
         index=True,
     )
 
-    user_id: UUID = Field(
-        sa_column=Column(
-            ForeignKey("users.id", ondelete="CASCADE"),
-            nullable=False,
-            index=True,
-        )
-    )
-
-    title: str = Field(
-        sa_column=Column(String(200), nullable=False)
-    )
-
-    description: str = Field(
-        default="",
-        sa_column=Column(String(2000), nullable=False, server_default=""),
-    )
-
-    completed: bool = Field(
-        default=False,
+    title = Column(
+        String(200),
         nullable=False,
     )
 
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=Column(DateTime(timezone=True), nullable=False),
+    description = Column(
+        String(2000),
+        nullable=False,
+        server_default="",
     )
 
-    class Config:
-        """Pydantic configuration."""
+    completed = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
 
-        json_schema_extra = {
-            "example": {
-                "id": 1,
-                "user_id": "123e4567-e89b-12d3-a456-426614174000",
-                "title": "Complete project documentation",
-                "description": "Write comprehensive docs for the API",
-                "completed": False,
-                "created_at": "2026-01-07T12:00:00Z",
-            }
-        }
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )

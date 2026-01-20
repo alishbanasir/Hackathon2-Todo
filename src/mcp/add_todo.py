@@ -8,7 +8,6 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from src.mcp.base import MCPTool
 

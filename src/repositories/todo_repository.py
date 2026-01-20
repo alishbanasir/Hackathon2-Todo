@@ -3,8 +3,8 @@
 from typing import List, Optional
 from uuid import UUID
 
-from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import async_session_maker
 from src.models.todo import Todo
