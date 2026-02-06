@@ -1,0 +1,136 @@
+# Default values for todo-app umbrella chart
+# This is a YAML-formatted file.
+
+# Global settings shared across all subcharts
+global:
+  # Image pull policy for all containers
+  imagePullPolicy: IfNotPresent
+  # Namespace for deployment
+  namespace: todo-app
+  # Environment (development, staging, production)
+  environment: development
+
+# Backend subchart configuration
+backend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: todo-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  config:
+    apiHost: "0.0.0.0"
+    apiPort: "8000"
+    logLevel: "INFO"
+    appEnv: "production"
+    corsOrigins: "http://frontend-service:3000,http://localhost:3000"
+  secrets:
+    # These should be overridden at deploy time
+    databaseUrl: ""
+    groqApiKey: ""
+    googleApiKey: ""
+    betterAuthSecret: ""
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+# Frontend subchart configuration
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: todo-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  config:
+    nextPublicApiUrl: "http://backend-service:8000/api/v1"
+    nodeEnv: "production"
+  probes:
+    liveness:
+      path: /api/health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      path: /api/health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+
+# PostgreSQL subchart configuration
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 5432
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  config:
+    database: "todo_db"
+    username: "todo_user"
+  secrets:
+    # This should be overridden at deploy time
+    password: ""
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: standard
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: todo.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 3000
+        - path: /api
+          pathType: Prefix
+          service: backend
+          port: 8000
+  tls: []

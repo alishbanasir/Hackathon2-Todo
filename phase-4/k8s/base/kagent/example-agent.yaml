@@ -1,0 +1,160 @@
+# Example kagent Agent for Todo AI Chatbot
+# NOTE: kagent is a placeholder/emerging technology
+# This example demonstrates the intended structure and capabilities
+
+apiVersion: kagent.io/v1alpha1
+kind: Agent
+metadata:
+  name: todo-health-monitor
+  namespace: todo-app
+  labels:
+    app.kubernetes.io/part-of: todo-app
+    app.kubernetes.io/component: monitoring
+spec:
+  # Human-readable description of the agent's purpose
+  description: |
+    Monitor Todo AI Chatbot application health.
+    Automatically restart unhealthy pods after 3 consecutive failures.
+    Send alerts on critical issues.
+
+  # Target resources to monitor
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: todo-app
+    namespaces:
+      - todo-app
+      - todo-app-dev
+      - todo-app-staging
+
+  # Event-based triggers
+  triggers:
+    # Trigger on unhealthy pod events
+    - name: pod-unhealthy
+      type: event
+      filter:
+        type: Warning
+        reason: Unhealthy
+        involvedObject:
+          kind: Pod
+      threshold:
+        count: 3
+        window: 5m
+
+    # Trigger on crash loop detection
+    - name: crash-loop
+      type: event
+      filter:
+        type: Warning
+        reason: BackOff
+        message: "Back-off restarting failed container"
+
+    # Trigger on OOM kill
+    - name: oom-killed
+      type: event
+      filter:
+        reason: OOMKilled
+
+  # Actions to take when triggers fire
+  actions:
+    # Restart the affected deployment
+    - name: restart-deployment
+      type: kubernetes
+      operation: rollout-restart
+      target:
+        kind: Deployment
+        # Dynamic - derived from event's owner reference
+        name: "{{ .event.involvedObject.ownerReferences[0].name }}"
+      when:
+        trigger: pod-unhealthy
+      cooldown: 5m
+
+    # Scale up on repeated crashes
+    - name: scale-up
+      type: kubernetes
+      operation: scale
+      target:
+        kind: Deployment
+        name: "{{ .event.involvedObject.ownerReferences[0].name }}"
+      params:
+        replicas: "+1"
+      maxReplicas: 5
+      when:
+        trigger: crash-loop
+      cooldown: 10m
+
+    # Send notification on any critical event
+    - name: notify-ops
+      type: notification
+      channel: slack
+      webhookSecret: slack-webhook
+      template: |
+        :alert: *Todo App Alert*
+
+        *Event:* {{ .trigger.name }}
+        *Namespace:* {{ .event.namespace }}
+        *Resource:* {{ .event.involvedObject.kind }}/{{ .event.involvedObject.name }}
+        *Message:* {{ .event.message }}
+        *Time:* {{ .event.lastTimestamp }}
+
+        _Agent: {{ .agent.name }}_
+
+  # Global configuration
+  config:
+    # Mode: active (execute actions) or dry-run (log only)
+    mode: dry-run  # Start with dry-run for safety
+
+    # Audit logging
+    audit:
+      enabled: true
+      retention: 7d
+
+    # Rate limiting
+    rateLimit:
+      maxActionsPerHour: 10
+
+    # Notification aggregation
+    aggregation:
+      window: 5m
+      maxMessages: 5
+
+---
+# Scheduled health check agent
+apiVersion: kagent.io/v1alpha1
+kind: Agent
+metadata:
+  name: todo-scheduled-check
+  namespace: todo-app
+spec:
+  description: "Periodic health verification for Todo app"
+
+  triggers:
+    - name: every-5-minutes
+      type: schedule
+      cron: "*/5 * * * *"
+
+  actions:
+    - name: verify-health
+      type: custom
+      script: |
+        #!/bin/bash
+        # Check backend health
+        BACKEND_STATUS=$(kubectl exec -n todo-app deploy/backend -- curl -s -o /dev/null -w "%{http_code}" localhost:8000/health)
+        if [ "$BACKEND_STATUS" != "200" ]; then
+          echo "Backend unhealthy: $BACKEND_STATUS"
+          exit 1
+        fi
+
+        # Check frontend health
+        FRONTEND_STATUS=$(kubectl exec -n todo-app deploy/frontend -- curl -s -o /dev/null -w "%{http_code}" localhost:3000/api/health)
+        if [ "$FRONTEND_STATUS" != "200" ]; then
+          echo "Frontend unhealthy: $FRONTEND_STATUS"
+          exit 1
+        fi
+
+        # Check postgres
+        kubectl exec -n todo-app postgres-0 -- pg_isready -U todo_user -d todo_db
+
+        echo "All services healthy"
+      onFailure:
+        - type: notification
+          message: "Health check failed for Todo app"

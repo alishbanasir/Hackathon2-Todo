@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    app: todo-backend
+    tier: api
+data:
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  LOG_LEVEL: "INFO"
+  APP_ENV: "production"
+  CORS_ORIGINS: "http://frontend-service:3000,http://localhost:3000"

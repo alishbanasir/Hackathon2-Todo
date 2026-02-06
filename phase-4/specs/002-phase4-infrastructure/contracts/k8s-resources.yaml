@@ -1,0 +1,262 @@
+# Kubernetes Resource Contracts
+# Defines the expected structure and requirements for all K8s resources
+
+apiVersion: v1
+kind: ContractDefinition
+metadata:
+  name: phase4-k8s-resources
+  description: Contract specifications for Phase-4 Kubernetes resources
+
+---
+# Namespace Contract
+resource: Namespace
+name: todo-app
+requirements:
+  - MUST be created before all other resources
+  - MUST use labels for resource organization
+labels:
+  app.kubernetes.io/name: todo-app
+  app.kubernetes.io/component: namespace
+  app.kubernetes.io/part-of: todo-ecosystem
+  app.kubernetes.io/managed-by: helm
+
+---
+# Backend Deployment Contract
+resource: Deployment
+name: backend
+namespace: todo-app
+requirements:
+  - MUST specify resource requests and limits
+  - MUST include liveness and readiness probes
+  - MUST run as non-root user
+  - MUST use rolling update strategy
+spec:
+  replicas: "1-10"
+  selector:
+    matchLabels:
+      app: todo-backend
+      tier: api
+  template:
+    metadata:
+      labels:
+        app: todo-backend
+        tier: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: backend
+          image: "todo-backend:*"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+
+---
+# Backend Service Contract
+resource: Service
+name: backend-service
+namespace: todo-app
+requirements:
+  - MUST expose port 8000
+  - MUST use ClusterIP type for internal access
+  - MUST select pods with app=todo-backend label
+spec:
+  type: ClusterIP
+  selector:
+    app: todo-backend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000
+
+---
+# Frontend Deployment Contract
+resource: Deployment
+name: frontend
+namespace: todo-app
+requirements:
+  - MUST specify resource requests and limits
+  - MUST include liveness and readiness probes
+  - MUST run as non-root user
+spec:
+  replicas: "1-10"
+  selector:
+    matchLabels:
+      app: todo-frontend
+      tier: web
+  template:
+    metadata:
+      labels:
+        app: todo-frontend
+        tier: web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: frontend
+          image: "todo-frontend:*"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          envFrom:
+            - configMapRef:
+                name: frontend-config
+
+---
+# Frontend Service Contract
+resource: Service
+name: frontend-service
+namespace: todo-app
+requirements:
+  - MUST expose port 3000
+  - MUST use NodePort for Minikube access
+spec:
+  type: NodePort
+  selector:
+    app: todo-frontend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+      nodePort: 30001
+
+---
+# Backend ConfigMap Contract
+resource: ConfigMap
+name: backend-config
+namespace: todo-app
+requirements:
+  - MUST contain all non-sensitive configuration
+  - MUST NOT contain secrets or passwords
+data:
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  LOG_LEVEL: "INFO"
+  APP_ENV: "development"
+  CORS_ORIGINS: "http://frontend-service:3000"
+
+---
+# Backend Secrets Contract
+resource: Secret
+name: backend-secrets
+namespace: todo-app
+requirements:
+  - MUST be created with envsubst from template
+  - MUST NOT be committed to version control with real values
+  - Values MUST be injected at deployment time
+type: Opaque
+stringData:
+  DATABASE_URL: "${DATABASE_URL}"
+  OPENAI_API_KEY: "${OPENAI_API_KEY}"
+  BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET}"
+
+---
+# HorizontalPodAutoscaler Contract
+resource: HorizontalPodAutoscaler
+name: backend-hpa
+namespace: todo-app
+requirements:
+  - MUST target backend deployment
+  - MUST scale based on CPU utilization
+  - MUST have min/max replica bounds
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+---
+# Ingress Contract
+resource: Ingress
+name: todo-ingress
+namespace: todo-app
+requirements:
+  - MUST route to frontend service
+  - MUST use nginx ingress class
+  - SHOULD support custom hostname
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: todo.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 3000
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-service
+                port:
+                  number: 8000

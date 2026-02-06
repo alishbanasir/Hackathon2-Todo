@@ -1,0 +1,498 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MCP Tools for Todo Management",
+  "description": "Model Context Protocol tool definitions for AI-powered todo CRUD operations. These tools are invoked by the OpenAI agent based on natural language user intent.",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "add_todo",
+      "description": "Create a new todo item for the authenticated user. Use this when the user expresses intent to add, create, or remember a task. Extract the task title from the user's message and optionally include additional details as description.",
+      "parameters": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The todo title describing what needs to be done. Should be concise and actionable (e.g., 'Buy groceries', 'Call mom', 'Finish project report')."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Optional additional details or context about the todo. Use this for clarifications, deadlines mentioned in conversation, or other relevant information.",
+            "default": ""
+          }
+        }
+      },
+      "returns": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the todo was created successfully"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable result message"
+          },
+          "todo_id": {
+            "type": "integer",
+            "description": "ID of the created todo (present only on success)"
+          },
+          "title": {
+            "type": "string",
+            "description": "The created todo's title (present only on success)"
+          },
+          "error_code": {
+            "type": "string",
+            "description": "Machine-readable error code (present only on failure)",
+            "enum": ["validation_error", "database_error", "authorization_error"]
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "title": "Buy groceries",
+            "description": "Milk, eggs, bread, and vegetables"
+          },
+          "output": {
+            "success": true,
+            "message": "Todo 'Buy groceries' created successfully",
+            "todo_id": 42,
+            "title": "Buy groceries"
+          }
+        },
+        {
+          "input": {
+            "title": "Call mom"
+          },
+          "output": {
+            "success": true,
+            "message": "Todo 'Call mom' created successfully",
+            "todo_id": 43,
+            "title": "Call mom"
+          }
+        },
+        {
+          "input": {
+            "title": ""
+          },
+          "output": {
+            "success": false,
+            "message": "Title cannot be empty",
+            "error_code": "validation_error"
+          }
+        }
+      ],
+      "error_handling": "If title is empty or exceeds 200 characters, return validation_error. If database operation fails, return database_error with user-friendly message. Never expose internal error details to the AI."
+    },
+    {
+      "name": "list_todos",
+      "description": "Retrieve all todos for the authenticated user. Use this when the user asks to see their tasks, what they need to do, or wants a list of todos. Optionally filter by completion status.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "type": "boolean",
+            "description": "Optional filter. If true, return only completed todos. If false, return only incomplete todos. If omitted, return all todos.",
+            "nullable": true,
+            "default": null
+          }
+        }
+      },
+      "returns": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable result message"
+          },
+          "todos": {
+            "type": "array",
+            "description": "List of todos (present only on success)",
+            "items": {
+              "type": "object",
+              "required": ["id", "title", "description", "completed", "created_at"],
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Todo ID"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Todo title"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Todo description (may be empty)"
+                },
+                "completed": {
+                  "type": "boolean",
+                  "description": "Whether the todo is completed"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the todo was created"
+                }
+              }
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of todos returned (present only on success)"
+          },
+          "error_code": {
+            "type": "string",
+            "description": "Machine-readable error code (present only on failure)"
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "success": true,
+            "message": "Retrieved 3 todos",
+            "total": 3,
+            "todos": [
+              {
+                "id": 42,
+                "title": "Buy groceries",
+                "description": "Milk, eggs, bread",
+                "completed": false,
+                "created_at": "2026-01-12T10:00:00Z"
+              },
+              {
+                "id": 43,
+                "title": "Call mom",
+                "description": "",
+                "completed": false,
+                "created_at": "2026-01-12T11:00:00Z"
+              },
+              {
+                "id": 44,
+                "title": "Finish project",
+                "description": "",
+                "completed": true,
+                "created_at": "2026-01-11T09:00:00Z"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "completed": false
+          },
+          "output": {
+            "success": true,
+            "message": "Retrieved 2 incomplete todos",
+            "total": 2,
+            "todos": [
+              {
+                "id": 42,
+                "title": "Buy groceries",
+                "description": "Milk, eggs, bread",
+                "completed": false,
+                "created_at": "2026-01-12T10:00:00Z"
+              },
+              {
+                "id": 43,
+                "title": "Call mom",
+                "description": "",
+                "completed": false,
+                "created_at": "2026-01-12T11:00:00Z"
+              }
+            ]
+          }
+        }
+      ],
+      "error_handling": "If database query fails, return database_error. Always enforce user isolation (todos filtered by authenticated user_id)."
+    },
+    {
+      "name": "complete_todo",
+      "description": "Mark a todo as completed. Use this when the user indicates they've finished a task, want to mark something as done, or check off an item.",
+      "parameters": {
+        "type": "object",
+        "required": ["todo_id"],
+        "properties": {
+          "todo_id": {
+            "type": "integer",
+            "description": "The ID of the todo to mark as complete. Must belong to the authenticated user."
+          }
+        }
+      },
+      "returns": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable result message"
+          },
+          "todo_id": {
+            "type": "integer",
+            "description": "ID of the completed todo (present only on success)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the completed todo (present only on success)"
+          },
+          "error_code": {
+            "type": "string",
+            "description": "Machine-readable error code (present only on failure)",
+            "enum": ["not_found", "already_completed", "authorization_error", "database_error"]
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "todo_id": 42
+          },
+          "output": {
+            "success": true,
+            "message": "Todo 'Buy groceries' marked as complete",
+            "todo_id": 42,
+            "title": "Buy groceries"
+          }
+        },
+        {
+          "input": {
+            "todo_id": 999
+          },
+          "output": {
+            "success": false,
+            "message": "Todo not found or does not belong to you",
+            "error_code": "not_found"
+          }
+        }
+      ],
+      "error_handling": "Return not_found if todo doesn't exist or doesn't belong to user (enforce user isolation). Return already_completed if todo is already marked complete (informational, not an error). Return authorization_error if user attempts to complete another user's todo."
+    },
+    {
+      "name": "update_todo",
+      "description": "Update a todo's title, description, or completion status. Use this when the user wants to modify, change, rename, or edit an existing todo.",
+      "parameters": {
+        "type": "object",
+        "required": ["todo_id"],
+        "properties": {
+          "todo_id": {
+            "type": "integer",
+            "description": "The ID of the todo to update. Must belong to the authenticated user."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "New title for the todo (optional, if omitted, title remains unchanged)",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "New description for the todo (optional, if omitted, description remains unchanged)",
+            "nullable": true
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "New completion status (optional, if omitted, status remains unchanged). Use complete_todo tool for simple completion.",
+            "nullable": true
+          }
+        }
+      },
+      "returns": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable result message"
+          },
+          "todo": {
+            "type": "object",
+            "description": "Updated todo object (present only on success)",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "completed": {
+                "type": "boolean"
+              }
+            }
+          },
+          "error_code": {
+            "type": "string",
+            "description": "Machine-readable error code (present only on failure)",
+            "enum": ["not_found", "validation_error", "authorization_error", "database_error"]
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "todo_id": 42,
+            "title": "Buy groceries and household items"
+          },
+          "output": {
+            "success": true,
+            "message": "Todo updated successfully",
+            "todo": {
+              "id": 42,
+              "title": "Buy groceries and household items",
+              "description": "Milk, eggs, bread",
+              "completed": false
+            }
+          }
+        },
+        {
+          "input": {
+            "todo_id": 43,
+            "completed": false
+          },
+          "output": {
+            "success": true,
+            "message": "Todo marked as incomplete",
+            "todo": {
+              "id": 43,
+              "title": "Call mom",
+              "description": "",
+              "completed": false
+            }
+          }
+        },
+        {
+          "input": {
+            "todo_id": 999,
+            "title": "New title"
+          },
+          "output": {
+            "success": false,
+            "message": "Todo not found or does not belong to you",
+            "error_code": "not_found"
+          }
+        }
+      ],
+      "error_handling": "Return not_found if todo doesn't exist or doesn't belong to user. Return validation_error if title is empty or exceeds limits. Return authorization_error if user attempts to update another user's todo. At least one field (title, description, or completed) must be provided."
+    },
+    {
+      "name": "delete_todo",
+      "description": "Permanently delete a todo. Use this when the user wants to remove, delete, or get rid of a task. Confirm with user before deletion if intent is ambiguous.",
+      "parameters": {
+        "type": "object",
+        "required": ["todo_id"],
+        "properties": {
+          "todo_id": {
+            "type": "integer",
+            "description": "The ID of the todo to delete. Must belong to the authenticated user."
+          }
+        }
+      },
+      "returns": {
+        "type": "object",
+        "required": ["success", "message"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation succeeded"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable result message"
+          },
+          "todo_id": {
+            "type": "integer",
+            "description": "ID of the deleted todo (present only on success)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the deleted todo (present only on success)"
+          },
+          "error_code": {
+            "type": "string",
+            "description": "Machine-readable error code (present only on failure)",
+            "enum": ["not_found", "authorization_error", "database_error"]
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "todo_id": 42
+          },
+          "output": {
+            "success": true,
+            "message": "Todo 'Buy groceries' deleted successfully",
+            "todo_id": 42,
+            "title": "Buy groceries"
+          }
+        },
+        {
+          "input": {
+            "todo_id": 999
+          },
+          "output": {
+            "success": false,
+            "message": "Todo not found or does not belong to you",
+            "error_code": "not_found"
+          }
+        }
+      },
+      "error_handling": "Return not_found if todo doesn't exist or doesn't belong to user (enforce user isolation). Return authorization_error if user attempts to delete another user's todo. Deletion is permanent and cannot be undone."
+    }
+  ],
+  "security": {
+    "user_isolation": {
+      "description": "All MCP tools MUST enforce user isolation at the execution level. The authenticated user_id (from JWT token) is injected into tool execution context and is NOT provided by the AI as a parameter. Tools validate that requested resources (todo_id) belong to the authenticated user before performing operations.",
+      "enforcement": "Repository layer filters all queries by user_id. Authorization failures return 403 Forbidden with error_code 'authorization_error'."
+    },
+    "input_validation": {
+      "description": "All tool parameters are validated using Pydantic models before execution. Invalid inputs return structured error responses with validation_error code.",
+      "validation_rules": [
+        "title: 1-200 characters (required for add_todo)",
+        "description: 0-2000 characters (optional)",
+        "todo_id: positive integer (required for complete, update, delete)",
+        "completed: boolean (optional for list_todos and update_todo)"
+      ]
+    },
+    "error_responses": {
+      "description": "All tools return structured responses with success boolean, message string, and optional error_code. Error messages are user-friendly and do not expose internal implementation details.",
+      "error_codes": [
+        "validation_error: Invalid input parameters",
+        "not_found: Requested resource does not exist or does not belong to user",
+        "authorization_error: User is not authorized to access the resource",
+        "already_completed: Todo is already marked as complete (informational)",
+        "database_error: Database operation failed (transient or persistent)"
+      ]
+    }
+  },
+  "implementation_notes": {
+    "async_execution": "All MCP tools must be implemented as async Python functions to integrate with FastAPI's async event loop.",
+    "transaction_handling": "Database operations should use transactions to ensure consistency. Rollback on any error.",
+    "logging": "All tool invocations must be logged with user_id, tool_name, parameters, and result for audit trail.",
+    "performance": "Target execution time: <500ms per tool invocation (per spec NFR).",
+    "openai_integration": "These tool definitions are converted to OpenAI function calling format and registered with the Assistant. The AI decides when to invoke each tool based on user intent."
+  }
+}

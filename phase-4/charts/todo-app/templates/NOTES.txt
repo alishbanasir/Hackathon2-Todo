@@ -1,0 +1,59 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+## Accessing the Application
+
+{{- if .Values.ingress.enabled }}
+The application is accessible via ingress:
+
+{{- range .Values.ingress.hosts }}
+  http://{{ .host }}
+{{- end }}
+
+Add the following to your /etc/hosts file:
+  $(minikube ip) {{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+To access the application, run:
+
+  kubectl port-forward svc/{{ .Release.Name }}-frontend-service 3000:3000 -n {{ .Release.Namespace }}
+
+Then open: http://localhost:3000
+{{- end }}
+
+## Components Deployed
+
+| Component | Service | Port |
+|-----------|---------|------|
+{{- if .Values.backend.enabled }}
+| Backend API | {{ .Release.Name }}-backend-service | 8000 |
+{{- end }}
+{{- if .Values.frontend.enabled }}
+| Frontend | {{ .Release.Name }}-frontend-service | 3000 |
+{{- end }}
+{{- if .Values.postgresql.enabled }}
+| PostgreSQL | {{ .Release.Name }}-postgresql-service | 5432 |
+{{- end }}
+
+## Useful Commands
+
+Check pod status:
+  kubectl get pods -n {{ .Release.Namespace }}
+
+View logs:
+  kubectl logs -l app=todo-backend -n {{ .Release.Namespace }}
+  kubectl logs -l app=todo-frontend -n {{ .Release.Namespace }}
+
+Scale backend:
+  kubectl scale deployment {{ .Release.Name }}-backend --replicas=3 -n {{ .Release.Namespace }}
+
+Upgrade release:
+  helm upgrade {{ .Release.Name }} ./charts/todo-app -n {{ .Release.Namespace }}
+
+Uninstall:
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}

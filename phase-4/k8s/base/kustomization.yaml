@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: todo-app
+
+resources:
+  - namespace.yaml
+  # Backend
+  - backend/configmap.yaml
+  - backend/secret.yaml
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - backend/hpa.yaml
+  # Frontend
+  - frontend/configmap.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - frontend/ingress.yaml
+  # PostgreSQL
+  - postgres/configmap.yaml
+  - postgres/secret.yaml
+  - postgres/pvc.yaml
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  # kagent (example)
+  - kagent/example-agent.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: todo-app
+  app.kubernetes.io/managed-by: kustomize

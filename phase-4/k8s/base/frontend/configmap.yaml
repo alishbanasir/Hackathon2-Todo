@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  labels:
+    app: todo-frontend
+    tier: web
+data:
+  NEXT_PUBLIC_API_URL: "http://backend-service:8000"
+  NODE_ENV: "production"
