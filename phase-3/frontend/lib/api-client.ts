@@ -1,21 +1,32 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 
-// Normalize the base URL: remove trailing slashes and /api/v1 suffix if present
+// Normalize the base URL: extract just the origin (protocol + host)
 // This ensures we always have a clean base URL to append /api/v1 paths to
 function normalizeBaseUrl(url: string): string {
   let normalized = url.trim();
+
   // Remove trailing slashes
   while (normalized.endsWith('/')) {
     normalized = normalized.slice(0, -1);
   }
-  // Remove /api/v1 suffix if already present (prevents doubling)
-  if (normalized.endsWith('/api/v1')) {
-    normalized = normalized.slice(0, -7);
+
+  // Try to extract just the origin (protocol + host + port)
+  // This handles cases where the URL includes paths like /api/v1 or /api/v1/chat
+  try {
+    const urlObj = new URL(normalized);
+    return urlObj.origin; // Returns just "https://example.com" without any path
+  } catch {
+    // If URL parsing fails, do manual cleanup
+    // Remove common API path suffixes
+    const suffixesToRemove = ['/api/v1/chat', '/api/v1', '/api'];
+    for (const suffix of suffixesToRemove) {
+      if (normalized.endsWith(suffix)) {
+        normalized = normalized.slice(0, -suffix.length);
+        break;
+      }
+    }
+    return normalized;
   }
-  if (normalized.endsWith('/api')) {
-    normalized = normalized.slice(0, -4);
-  }
-  return normalized;
 }
 
 const API_BASE_URL = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
