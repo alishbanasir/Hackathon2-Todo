@@ -10,8 +10,17 @@ import {
 import { useRouter } from "next/navigation";
 import { apiClient } from "./api-client";
 
-// Phase 2 backend URL for authentication
-const PHASE2_AUTH_URL = "http://localhost:8000/api/v1";
+// Backend URL for authentication - use environment variable or default to localhost
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Normalize: remove trailing slashes and any path suffix to get just the origin
+const normalizeUrl = (url: string): string => {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url.replace(/\/+$/, '');
+  }
+};
+const API_BASE_URL = `${normalizeUrl(BACKEND_BASE_URL)}/api/v1`;
 
 interface AuthContextType {
   token: string | null;
@@ -62,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithCredentials = async (email: string, password: string) => {
-    const loginUrl = `${PHASE2_AUTH_URL}/auth/login`;
+    const loginUrl = `${API_BASE_URL}/auth/login`;
     console.log("Attempting login to:", loginUrl);
 
     let response: Response;
@@ -100,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string) => {
-    const response = await fetch(`${PHASE2_AUTH_URL}/auth/register`, {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
