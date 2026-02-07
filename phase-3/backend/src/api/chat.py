@@ -186,3 +186,14 @@ async def chat(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process chat message. Please try again.",
         )
+
+
+# Alias endpoint for /chat/chat (handles doubled path from frontend URL misconfiguration)
+@router.post("/chat/chat", include_in_schema=False)
+async def chat_alias(
+    request: ChatRequest,
+    user_id: UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> ChatResponse:
+    """Alias for /chat endpoint - handles doubled path."""
+    return await chat(request, user_id, session)
