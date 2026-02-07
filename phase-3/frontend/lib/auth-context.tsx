@@ -12,15 +12,14 @@ import { apiClient } from "./api-client";
 
 // Backend URL for authentication - use environment variable or default to localhost
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-// Normalize: remove trailing slashes and any path suffix to get just the origin
-const normalizeUrl = (url: string): string => {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return url.replace(/\/+$/, '');
-  }
-};
-const API_BASE_URL = `${normalizeUrl(BACKEND_BASE_URL)}/api/v1`;
+const API_BASE_URL = `${BACKEND_BASE_URL.replace(/\/+$/, '')}/api/v1`;
+
+// Debug logging
+if (typeof window !== 'undefined') {
+  console.log("[Auth] NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
+  console.log("[Auth] BACKEND_BASE_URL:", BACKEND_BASE_URL);
+  console.log("[Auth] API_BASE_URL:", API_BASE_URL);
+}
 
 interface AuthContextType {
   token: string | null;
