@@ -167,7 +167,7 @@ async def ping():
 # Import and register API routers
 from src.api import chat, conversations
 
-app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(conversations.router)
 
 if __name__ == "__main__":
