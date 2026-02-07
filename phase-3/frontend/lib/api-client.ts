@@ -1,6 +1,30 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Normalize the base URL: remove trailing slashes and /api/v1 suffix if present
+// This ensures we always have a clean base URL to append /api/v1 paths to
+function normalizeBaseUrl(url: string): string {
+  let normalized = url.trim();
+  // Remove trailing slashes
+  while (normalized.endsWith('/')) {
+    normalized = normalized.slice(0, -1);
+  }
+  // Remove /api/v1 suffix if already present (prevents doubling)
+  if (normalized.endsWith('/api/v1')) {
+    normalized = normalized.slice(0, -7);
+  }
+  if (normalized.endsWith('/api')) {
+    normalized = normalized.slice(0, -4);
+  }
+  return normalized;
+}
+
+const API_BASE_URL = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
+
+// Log the configured base URL for debugging
+if (typeof window !== 'undefined') {
+  console.log("[API Client] Base URL configured:", API_BASE_URL);
+  console.log("[API Client] Original NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
+}
 
 export interface ChatRequest {
   message: string;
@@ -79,12 +103,12 @@ class ApiClient {
             // Trim whitespace and newlines that can cause ISO-8859-1 encoding errors
             const token = rawToken.trim().replace(/[\r\n]/g, '');
             config.headers.Authorization = `Bearer ${token}`;
-            console.log("API Request:", config.method?.toUpperCase(), config.url, "- Token present:", token.substring(0, 20) + "...");
+            console.log("[API Request]", config.method?.toUpperCase(), `${config.baseURL}${config.url}`, "- Token present");
           } else {
-            console.warn("API Request:", config.method?.toUpperCase(), config.url, "- No token available!");
+            console.warn("[API Request]", config.method?.toUpperCase(), `${config.baseURL}${config.url}`, "- No token!");
           }
         } else {
-          console.warn("API Request:", config.method?.toUpperCase(), config.url, "- Token provider not set!");
+          console.warn("[API Request]", config.method?.toUpperCase(), `${config.baseURL}${config.url}`, "- No token provider!");
         }
         return config;
       },
